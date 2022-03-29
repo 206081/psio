@@ -1,4 +1,5 @@
 import os.path
+import pathlib
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -7,7 +8,6 @@ from skimage import io, img_as_float32
 
 
 def read_images_1(dir_path, imgs):
-
 
     for _img in imgs:
 
@@ -50,5 +50,5 @@ def read_images_1(dir_path, imgs):
 
 
 if __name__ == "__main__":
-    dir_path = r"/home/michal/PycharmProjects/pythonProject/input1"
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input1")
     read_images_1(dir_path, os.listdir(dir_path))

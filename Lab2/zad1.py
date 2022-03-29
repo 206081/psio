@@ -1,3 +1,6 @@
+import os
+import pathlib
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.image import imsave, imread
@@ -94,4 +97,5 @@ def read_images_1(img_path):
 
 
 if __name__ == "__main__":
-    read_images_1("/home/michal/PycharmProjects/pythonProject/input1/coins.png")
+    img_path = os.path.join(pathlib.Path(__file__).parent.parent, "input1", "coins.png")
+    read_images_1(img_path)

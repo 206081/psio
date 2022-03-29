@@ -1,12 +1,13 @@
 import os.path
+import pathlib
 from enum import Enum
 
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage import io, img_as_float
+from skimage import io, img_as_float, img_as_ubyte
 from skimage.filters import gaussian
 from skimage.filters.rank import mean, mean_bilateral, median
-from skimage.morphology import disk, cube
+from skimage.morphology import disk
 
 
 class Noise(Enum):
@@ -32,9 +33,6 @@ def add_noise(noise_type, image):
         sigma = var ** 0.5
         gauss = np.random.normal(mean, sigma, shp)
         noise = image + gauss
-        noise[noise > 1] = 1
-        noise[noise < 0] = 0
-        return noise
 
     if noise_type == Noise.uniform:
         k = 0.5
@@ -47,26 +45,22 @@ def add_noise(noise_type, image):
 
         noise = image + k * (noise - 0.5)
 
-        return noise
-
     if noise_type == Noise.s_n_p:
         sh = image.shape
         s_vs_p = 0.5
         amount = 0.05
-        out = np.copy(image)
+        noise = np.copy(image)
         num_salt = np.ceil(amount * image.size * s_vs_p)
         coords = [np.random.randint(0, i - 1, int(num_salt)) for i in sh]
-        out[coords] = 1
+        noise[coords] = 1
 
         num_peper = np.ceil(amount * image.size * (1.0 - s_vs_p))
         coords = [np.random.randint(0, i - 1, int(num_peper)) for i in sh]
-        out[coords] = 0
-        return out
+        noise[coords] = 0
 
     if noise_type == Noise.poisson:
         PEAK = 20
-        noisy = image + np.random.poisson(0.5 * PEAK, image.shape) / PEAK
-        return noisy
+        noise = image + np.random.poisson(0.5 * PEAK, image.shape) / PEAK
 
     if noise_type == Noise.speckle:
         if image.ndim == 2:
@@ -76,104 +70,78 @@ def add_noise(noise_type, image):
             row, col, chan = image.shape
             noise = np.random.randn(row, col, chan)
 
-        noisy = image + image * 0.2 * noise
-        return noisy
+        noise = image + image * 0.2 * noise
+    noise[noise > 1] = 1
+    noise[noise < 0] = 0
+    return noise
 
 
 def lowpass_filter(filter_type, image):
+    if filter_type == Filter.mean_bilateral:
+        image = img_as_ubyte(image)
+        if image.ndim > 2:
+            for i in range(image.ndim):
+                image[:, :, i] = mean_bilateral(image[:, :, i], footprint=disk(20), s0=50, s1=180)
+        else:
+            image = mean_bilateral(image, footprint=disk(20), s0=50, s1=180)
+        return image
+
     if filter_type == Filter.gauss:
         return gaussian(image, sigma=2, mode="reflect")
 
     if filter_type == Filter.mean:
-        return mean(image, footprint=cube(20))
-
-    if filter_type == Filter.mean_bilateral:
-        print(image)
-        a = [0] * 3
-        n = np.zeros((2,3))
-        for i in range(3):
-            a[i] = mean_bilateral(image[:, :, i], footprint=disk(10), s0=50, s1=50)
-        print("a", a)
-        for x,y,z in a:
-            for i,j,k in zip(x,y,z):
-                n.put(i,j,k)
-        print("n", n)
+        image = img_as_ubyte(image)
+        footprint = disk(5)
+        if image.ndim > 2:
+            for i in range(image.ndim):
+                image[:, :, i] = mean(image[:, :, i], footprint=footprint)
+        else:
+            image = mean(image, footprint=footprint)
+        return image
 
     if filter_type == Filter.median:
-        return median(image)
+        footprint = disk(2)
+        if image.ndim > 2:
+            for i in range(image.ndim):
+                image[:, :, i] = median(image[:, :, i], footprint=footprint)
+        else:
+            image = median(image, footprint=footprint)
+        return image
 
 
 def read_images_3(input):
 
     images = ["motorcycle_left.png", "parrot.png", "cameraman.bmp", "horse.png"]
-    """
-    s&p median
-    gauss 
-    uniform
-    poisson
-    speckle
-    """
+
     row, column = 4, 2
-    # Original picture
-    fig = plt.figure("Zad3")
-    plt.axis("off")
-    moto = io.imread(os.path.join(input, images[0]))
-    moto = img_as_float(moto)
-    i = 1
+    for noise in Noise:
+        for i in range(len(images)):
+            fig = plt.figure(images[i] + noise.value)
+            plt.axis("off")
+            img = io.imread(os.path.join(input, images[i]))
+            img = img_as_float(img)
+            i = 1
 
-    noise = Noise.gauss
-    fig.add_subplot(row, column, i, title=f"Original")
-    plt.imshow(moto)
-    plt.axis("off")
+            fig.add_subplot(row, column, i, title=f"Original")
+            plt.imshow(img)
+            plt.axis("off")
 
-    i += 1
-    fig.add_subplot(row, column, i, title=f"{noise.value} Noise")
-    moto_noise = add_noise(noise, moto)
-    plt.imshow(moto_noise)
-    plt.axis("off")
+            i += 1
+            fig.add_subplot(row, column, i, title=f"{noise.value} Noise")
+            img_noise = add_noise(noise, img)
+            plt.imshow(img_noise)
+            plt.axis("off")
 
-    i += 1
-    for filter in Filter:
-        print(filter)
-        fig.add_subplot(row, column, i, title=filter.value)
-        plt.imshow(lowpass_filter(filter, moto_noise))
-        plt.axis("off")
-        i += 1
-
-    # fig.add_subplot(row, column, i, title="Uniform Noise")
-    # uniform = add_noise("uniform", img)
-    # plt.imshow(uniform, cmap="gray")
-    # plt.axis("off")
-    # i += 1
-    #
-    # fig.add_subplot(row, column, i, title="Filtered Mean")
-    # plt.imshow(lowpass_filter("mean", uniform), cmap="gray")
-    # plt.axis("off")
-    # i += 1
-    #
-    # fig.add_subplot(row, column, i, title="S&P Noise")
-    # s_and_p = add_noise("s&p", img)
-    # plt.imshow(s_and_p, cmap="gray")
-    # plt.axis("off")
-    # i += 1
-    #
-    # fig.add_subplot(row, column, i, title="Filtered Median")
-    # plt.imshow(lowpass_filter("median", s_and_p), cmap="gray")
-    # plt.axis("off")
-    # i += 1
-    #
-    # fig.add_subplot(row, column, i, title="Speckle Noise")
-    # speckle = add_noise("speckle", data.coins())
-    # plt.imshow(speckle, cmap="gray")
-    # plt.axis("off")
-    # i += 1
-    #
-    # fig.add_subplot(row, column, i, title="Filtered Mean Bilateral")
-    # plt.imshow(lowpass_filter("mean_bilateral", speckle), cmap="gray")
-    # plt.axis("off")
+            i += 1
+            for _filter in Filter:
+                fig.add_subplot(row, column, i, title=_filter.value)
+                plt.imshow(lowpass_filter(_filter, img_noise.copy()))
+                plt.axis("off")
+                i += 1
 
     plt.show(block=True)
 
 
 if __name__ == "__main__":
-    read_images_3(r"/home/michal/PycharmProjects/pythonProject/input1")
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input1")
+    read_images_3(dir_path)
