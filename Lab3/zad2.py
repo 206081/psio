@@ -1,45 +1,94 @@
-from cv2 import imread, threshold, THRESH_BINARY, resize, adaptiveThreshold, ADAPTIVE_THRESH_MEAN_C
-from matplotlib import pyplot as plt
-from numpy import asarray
-from scipy.ndimage import binary_fill_holes, prewitt
-from skimage import img_as_ubyte, img_as_float32, io, img_as_float64
-from skimage.feature import canny
+import os
+import pathlib
 
-from skimage.filters import thresholding
+from matplotlib import pyplot as plt
+from scipy.ndimage import binary_fill_holes
+from skimage import io, img_as_float64
+from skimage.feature import canny
+from skimage.filters.edges import prewitt, sobel
 from skimage.filters.thresholding import apply_hysteresis_threshold
-from skimage.morphology import remove_small_objects
+from skimage.morphology import dilation, disk, erosion
 
 
 def read_gears(_img):
 
     # Read image
-    _img = io.imread(_img)
-    row = 3
-    column = 2
-    _img = 1 - img_as_float64(_img)
+    _img = io.imread(_img, as_gray=True)
+    row = 1
+    column = 3
+    _img_as_float = 1 - img_as_float64(_img)
 
-    plt.subplot(row, column, 1)
+    # ------------------------------------------------------------------------------------------------------------------
+    plt.figure("Filling Holes")
+    plt.axis("off")
+    plt.subplot(row, column, 1, title="Original →")
+    plt.imshow(_img_as_float, cmap="gray")
+
+    hysteresis = apply_hysteresis_threshold(_img_as_float, 0.25, 0.5)
+    plt.subplot(row, column, 2, title="Hysteresis →")
+    plt.imshow(hysteresis, cmap="gray")
+
+    binary_hysteresis = binary_fill_holes(hysteresis)
+    plt.subplot(row, column, 3, title="Binary Fill Holes")
+    plt.imshow(binary_hysteresis, cmap="gray")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    plt.figure("Canny")
+    plt.axis("off")
+    plt.subplot(row, column + 1, 1, title="Original →")
     plt.imshow(_img, cmap="gray")
 
-    img = apply_hysteresis_threshold(_img, 0.25, 0.5)
-    plt.subplot(row, column, 2)
-    plt.imshow(img, cmap="gray")
+    _canny = canny(1 - _img, sigma=1.5, low_threshold=0.15, high_threshold=40)
+    plt.subplot(row, column + 1, 2, title="Canny →")
+    plt.imshow(_canny, cmap="gray")
 
-    img = canny(_img, sigma=1.5, low_threshold=0.15, high_threshold=0.4)
-    plt.subplot(row, column, 3)
-    plt.imshow(img, cmap="gray")
+    _dilation = dilation(_canny)
+    plt.subplot(row, column + 1, 3, title="Dilation →")
+    plt.imshow(_dilation, cmap="gray")
 
-    img2 = binary_fill_holes(img)
-    plt.subplot(row, column, 4)
-    plt.imshow(img2, cmap="gray")
+    binary_canny = binary_fill_holes(_dilation)
+    plt.subplot(row, column + 1, 4, title="Binary Fill Holes")
+    plt.imshow(binary_canny, cmap="gray")
 
-    img3 = prewitt(img)
-    plt.subplot(row, column, 5)
-    plt.imshow(img3, cmap="gray")
+    # ------------------------------------------------------------------------------------------------------------------
+    plt.figure("Prewitt")
+    plt.axis("off")
+    plt.subplot(row, column + 2, 1, title="Original →")
+    plt.imshow(_img, cmap="gray")
 
+    _prewitt = prewitt(_img_as_float)
+    plt.subplot(row, column + 2, 2, title="Prewitt →")
+    plt.imshow(_prewitt, cmap="gray")
+
+    _erosion_prewitt = erosion(_prewitt, footprint=disk(1))
+    plt.subplot(row, column + 2, 3, title="Erosion →")
+    plt.imshow(_erosion_prewitt, cmap="gray")
+
+    _dilation_prewitt = dilation(_erosion_prewitt, footprint=disk(1))
+    plt.subplot(row, column + 2, 4, title="Dilation →")
+    plt.imshow(_dilation_prewitt, cmap="gray")
+
+    binary_prewitt = binary_fill_holes(_dilation_prewitt)
+    plt.subplot(row, column + 2, 5, title="Binary Fill Holes")
+    plt.imshow(binary_prewitt, cmap="gray")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    plt.figure("Sobel")
+    plt.axis("off")
+    plt.subplot(row, column, 1, title="Original →")
+    plt.imshow(_img, cmap="gray")
+
+    _sobel = sobel(_img_as_float)
+    plt.subplot(row, column, 2, title="Sobel →")
+    plt.imshow(_sobel, cmap="gray")
+
+    binary_sobel = binary_fill_holes(_sobel)
+    plt.subplot(row, column, 3, title="Binary Fill Holes")
+    plt.imshow(binary_sobel, cmap="gray")
 
     plt.show(block=True)
 
 
 if __name__ == "__main__":
-    read_gears(r"/home/michal/PycharmProjects/pythonProject/gears.bmp")
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input3", "gears.bmp")
+    read_gears(dir_path)

@@ -1,9 +1,10 @@
-from cv2 import imread, threshold, THRESH_BINARY, resize, adaptiveThreshold, ADAPTIVE_THRESH_MEAN_C
-from matplotlib import pyplot as plt
-from numpy import asarray
-from scipy.ndimage import binary_fill_holes
-from skimage import img_as_ubyte, img_as_float32, io, img_as_float64
+import os
+import pathlib
 
+from cv2 import threshold, THRESH_BINARY, adaptiveThreshold, ADAPTIVE_THRESH_MEAN_C
+from matplotlib import pyplot as plt
+from scipy.ndimage import binary_fill_holes
+from skimage import img_as_ubyte, io, img_as_float64
 from skimage.filters import thresholding
 from skimage.morphology import remove_small_objects
 
@@ -39,9 +40,9 @@ def read_tumor(_img):
     plt.subplot(row, column, 5)
     plt.imshow(img)
 
-
     plt.show(block=True)
 
 
 if __name__ == "__main__":
-    read_tumor(r"/home/michal/PycharmProjects/pythonProject/brain_tumor.bmp")
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input3", "brain_tumor.bmp")
+    read_tumor(dir_path)
