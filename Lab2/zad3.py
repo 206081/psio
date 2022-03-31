@@ -100,13 +100,7 @@ def lowpass_filter(filter_type, image):
         return image
 
     if filter_type == Filter.median:
-        footprint = disk(2)
-        if image.ndim > 2:
-            for i in range(image.ndim):
-                image[:, :, i] = median(image[:, :, i], footprint=footprint)
-        else:
-            image = median(image, footprint=footprint)
-        return image
+        return median(image)
 
 
 def read_images_3(input):
