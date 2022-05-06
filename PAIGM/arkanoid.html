@@ -13,14 +13,14 @@
             background-color: #f1f1f1;
         }
 
-        .div-button-left {
+        .button-left {
             position: absolute;
             bottom: 10px;
             width: 50%;
             border: 3px solid #8AC007;
         }
 
-        .div-button-right {
+        .button-right {
             position: absolute;
             bottom: 10px;
             right: 0;
@@ -34,11 +34,19 @@
 </head>
 <body onload="startGame()">
 
-<button class="div-button-left" onmousedown="startGame()" ontouchstart="startGame()">START</button>
-<button class="div-button-right" onmousedown="myGameArea.stop()" ontouchstart="myGameArea.stop()">STOP</button>
+<button class="button-left" onmousedown="startGame()" ontouchstart="startGame()">START</button>
+<button class="button-right" onmousedown="myGameArea.stop()" ontouchstart="myGameArea.stop()">STOP</button>
+<button onclick="readLeaderboard()">Read leaderboard</button>
 <p id="score"></p>
 </body>
 <script>
+    window.indexedDB = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
+    window.IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction || window.msIDBTransaction;
+    window.IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange
+
+    if (!window.indexedDB) {
+        window.alert("Your browser doesn't support a stable version of IndexedDB.")
+    }
 
     let myGamePiece;
     let myBall;
@@ -50,27 +58,42 @@
     let score;
     let ballSpeed = 2;
     let padSpeed = 3;
+    let padOffset = 10;
+    let id;
+    let gameStop = false;
+    let db;
+    let request = window.indexedDB.open("leaderboard", 1);
 
     function startGame() {
-        myGamePiece = new Component(100, 20, "red", 300, height - 20);
+        obstacles = []
+        keyState = {}
+        height = 620
+        width = 600
         score = 0;
+        time = 0;
+        gameStop = false
+        myGamePiece = new Component(100, 20, "red", 300, height - 20);
         myBall = new Component(0, 0, "red", 350, height - 20 - 5, 5);
         AddBlockRow();
         myGameArea.start();
+
+    }
+
+    function stopper() {
+        time++;
     }
 
     let myGameArea = {
         canvas: document.createElement("canvas"),
         div: document.getElementById("GameArea"),
         start: function () {
-            if (!startGameState)
-                this.stop();
             startGameState = true;
             this.canvas.width = width;
             this.canvas.height = height;
             this.context = this.canvas.getContext("2d");
             document.body.insertBefore(this.canvas, document.body.firstChild);
             this.interval = setInterval(updateGameArea, 20);
+            this.timer = setInterval(stopper, 1000);
         },
         clear: function () {
             this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -87,6 +110,9 @@
         },
         stop: function () {
             clearInterval(this.interval);
+            clearInterval(this.timer);
+            addScore();
+            readLeaderboard();
         }
     }
 
@@ -96,34 +122,11 @@
         let blockWidth = 50;
         let blockHeight = 50;
 
-        for (y = startBlock; y < 3 * blockHeight + startBlock; y += blockHeight + blockSpacing) {
-            for (x = startBlock; x < width - blockWidth; x += blockWidth + blockSpacing) {
+        for (let y = startBlock; y < 3 * blockHeight + startBlock; y += blockHeight + blockSpacing) {
+            for (let x = startBlock; x < width - blockWidth; x += blockWidth + blockSpacing) {
                 obstacles.push(new Component(blockWidth, blockHeight, "green", x, y));
             }
         }
-    }
-
-    function RectCircleColliding(circle, rect) {
-        let distX = Math.abs(circle.x - rect.x - rect.width / 2);
-        let distY = Math.abs(circle.y - rect.y - rect.height / 2);
-
-        if (distX > (rect.width / 2 + circle.r)) {
-            return false;
-        }
-        if (distY > (rect.height / 2 + circle.r)) {
-            return false;
-        }
-
-        if (distX <= (rect.width / 2)) {
-            return true;
-        }
-        if (distY <= (rect.height / 2)) {
-            return true;
-        }
-
-        let dx = distX - rect.width / 2;
-        let dy = distY - rect.height / 2;
-        return (dx * dx + dy * dy <= (circle.r * circle.r));
     }
 
     function Component(width, height, color, x, y, radius = 0) {
@@ -177,7 +180,7 @@
                 this.speedY = ballSpeed;
             }
             if (this.y + this.radius >= myGameArea.canvas.height) {
-                myGameArea.stop();
+                gameStop = true;
             }
 
             // Handling collision with components
@@ -230,25 +233,17 @@
         myGamePiece.update();
         myBall.drawBall();
         myBall.newPos();
-        myBall.checkCollision(myGamePiece);
         obstacles.forEach((obstacle) => {
             if (myBall.checkCollision(obstacle)) {
                 obstacle.isAlive = false;
                 score++;
             }
         })
+        myBall.checkCollision(myGamePiece);
+        if (gameStop)
+            myGameArea.stop();
         moveMyGameObject();
     }
-
-    function moveleft() {
-    }
-
-    function moveright() {
-    }
-
-    function clearmove() {
-    }
-
 
     window.addEventListener('keydown', function (e) {
         keyState[e.code] = true;
@@ -261,15 +256,61 @@
     function moveMyGameObject() {
         myGamePiece.speedX = 0;
 
-        if (keyState["ArrowRight"]) {
+        if (keyState["ArrowRight"] && myGamePiece.x <= width - padOffset)
             myGamePiece.speedX = padSpeed;
-        }
 
-        if (keyState["ArrowLeft"]) {
+        if (keyState["ArrowLeft"] && myGamePiece.x + myGamePiece.width >= padOffset)
             myGamePiece.speedX = -padSpeed;
+
+    }
+
+
+    request.onerror = function (event) {
+        console.log("error: ");
+    };
+
+    request.onsuccess = function (event) {
+        db = request.result;
+        console.log("success: " + db);
+    };
+
+    request.onupgradeneeded = function (event) {
+        let db = event.target.result;
+        db.createObjectStore("player", {keyPath: "id", autoIncrement: true});
+    }
+
+    function addScore() {
+        let name = prompt("Please enter your nick", "Nick");
+        let date = new Intl.DateTimeFormat('en-US', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+        }).format(new Date());
+
+        let request = db.transaction(["player"], "readwrite")
+            .objectStore("player")
+            .add({name: name, score: score, time: time, date: date});
+
+        request.onerror = function (event) {
+            alert("Unable to add data!");
         }
+    }
 
+    function readLeaderboard() {
+        let objectStore = db.transaction("player").objectStore("player");
+        let board = "";
 
+        objectStore.openCursor().onsuccess = function (event) {
+            let cursor = event.target.result;
+            if (cursor) {
+                board += "Name: " + cursor.value.name
+                    + "\tScore: " + cursor.value.score
+                    + "\tTime: " + cursor.value.time
+                    + "\tDate: " + cursor.value.date + "\n";
+                cursor.continue();
+            } else {
+                alert(board);
+            }
+        };
     }
 
 
