@@ -48,32 +48,38 @@
         window.alert("Your browser doesn't support a stable version of IndexedDB.")
     }
 
+    let ctx;
     let myGamePiece;
     let myBall;
-    let startGameState = true;
     let keyState = {};
     let obstacles = [];
     let height = 620;
     let width = 600;
     let score;
+    let time;
     let ballSpeed = 2;
     let padSpeed = 3;
-    let padOffset = 10;
-    let id;
     let gameStop = false;
+    let id;
     let db;
     let request = window.indexedDB.open("leaderboard", 1);
+    let movementFactorX = 1;
+    let movementFactorY = 1;
 
     function startGame() {
-        obstacles = []
-        keyState = {}
-        height = 620
-        width = 600
+        obstacles = [];
+        keyState = {};
+        height = 620;
+        width = 600;
         score = 0;
         time = 0;
-        gameStop = false
+        gameStop = false;
+        movementFactorX = 1;
+        movementFactorY = 1;
         myGamePiece = new Component(100, 20, "red", 300, height - 20);
         myBall = new Component(0, 0, "red", 350, height - 20 - 5, 5);
+        myBall.speedX = ballSpeed;
+        myBall.speedY = -ballSpeed;
         AddBlockRow();
         myGameArea.start();
 
@@ -86,10 +92,11 @@
     let myGameArea = {
         canvas: document.createElement("canvas"),
         div: document.getElementById("GameArea"),
+        width: width,
+        height: height,
         start: function () {
-            startGameState = true;
-            this.canvas.width = width;
-            this.canvas.height = height;
+            this.canvas.width = this.width;
+            this.canvas.height = this.height;
             this.context = this.canvas.getContext("2d");
             document.body.insertBefore(this.canvas, document.body.firstChild);
             this.interval = setInterval(updateGameArea, 20);
@@ -111,8 +118,8 @@
         stop: function () {
             clearInterval(this.interval);
             clearInterval(this.timer);
-            addScore();
-            readLeaderboard();
+            // addScore();
+            // readLeaderboard();
         }
     }
 
@@ -158,69 +165,74 @@
             ctx.arc(this.x, this.y, this.radius, 0, 2 * Math.PI);
             ctx.fill();
         };
-        this.between = function (cord, obst) {
-            let offset = Math.ceil(ballSpeed / 2)
-            return cord - offset <= obst && cord + offset >= obst;
-        };
-        this.checkCollision = function (object) {
-            if (startGameState) {
-                this.speedX = ballSpeed;
-                this.speedY = -ballSpeed;
-                startGameState = false;
-            }
-
+        this.collisionGameArea = function () {
             // Handling collision with GameArea
             if (this.x + this.radius >= myGameArea.canvas.width) {
-                this.speedX = -ballSpeed;
+                this.speedX = -ballSpeed / movementFactorX;
             }
             if (this.x - this.radius <= 0) {
-                this.speedX = ballSpeed;
+                this.speedX = ballSpeed / movementFactorX;
             }
             if (this.y - this.radius <= 0) {
-                this.speedY = ballSpeed;
+                this.speedY = ballSpeed / movementFactorY;
             }
             if (this.y + this.radius >= myGameArea.canvas.height) {
                 gameStop = true;
             }
 
-            // Handling collision with components
-            // Bottom
-            if (this.between(this.y - this.radius, object.y + object.height) &&
-                this.x + this.radius >= object.x &&
-                this.x - this.radius <= object.x + object.width) {
-                this.speedY = ballSpeed;
-                return true;
-            }
+        }
+        this.checkCollision = function (object) {
 
-            // Top
-            if (this.between(this.y + this.radius, object.y) &&
-                this.x - this.radius >= object.x &&
-                this.x + this.radius <= object.x + object.width) {
-                this.speedY = -ballSpeed;
-                return true;
-            }
+            x = clamp(object.x, object.x + object.width, this.x);
+            y = clamp(object.y, object.y + object.height, this.y);
 
-            // Right
-            if (this.between(this.x - this.radius, object.x + object.width) &&
-                this.y - this.radius >= object.y &&
-                this.y + this.radius <= object.y + object.height) {
-                this.speedX = ballSpeed;
-                return true;
-            }
-
-            // Left
-            if (this.between(this.x + this.radius, object.x) &&
-                this.y - this.radius >= object.y &&
-                this.y + this.radius <= object.y + object.height) {
-                this.speedX = -ballSpeed;
+            if (Math.pow(x - this.x, 2) + Math.pow(y - this.y, 2) <= Math.pow(this.radius, 2)) {
+                if (this.x > object.x && this.x < object.x + object.width) {
+                    movementFactorY = movementFactor(this.x, object.x, object.width);
+                    if (this.y < object.y) {
+                        this.speedY = -ballSpeed / movementFactorY;
+                    }
+                    if (this.y > object.y + object.height) {
+                        this.speedY = ballSpeed / movementFactorY;
+                    }
+                }
+                if (this.y > object.y && this.y < object.y + object.height) {
+                    movementFactorX = movementFactor(this.y, object.y, object.height);
+                    if (this.x < object.x) {
+                        this.speedX = -ballSpeed / movementFactorX;
+                    }
+                    if (this.x > object.x + object.width) {
+                        this.speedX = ballSpeed / movementFactorX;
+                    }
+                }
                 return true;
             }
 
             return false;
-
         }
+    }
 
+    function clamp(min, max, value) {
+        return Math.max(min, Math.min(max, value));
+    }
 
+    function movementFactor(ballCenter, begin, length) {
+        let _movementFactor;
+        if (ballCenter <= begin + length / 10)
+            _movementFactor = 3;
+        else if (ballCenter <= begin + length * 3 / 10)
+            _movementFactor = 2;
+        else if (ballCenter <= begin + length * 4 / 10)
+            _movementFactor = 1.5;
+        else if (ballCenter <= begin + length * 6 / 10)
+            _movementFactor = 1;
+        else if (ballCenter <= begin + length * 7 / 10)
+            _movementFactor = 1.5;
+        else if (ballCenter <= begin + length * 9 / 10)
+            _movementFactor = 2;
+        else
+            _movementFactor = 3
+        return _movementFactor
     }
 
     function updateGameArea() {
@@ -233,6 +245,7 @@
         myGamePiece.update();
         myBall.drawBall();
         myBall.newPos();
+        myBall.collisionGameArea();
         obstacles.forEach((obstacle) => {
             if (myBall.checkCollision(obstacle)) {
                 obstacle.isAlive = false;
@@ -240,9 +253,9 @@
             }
         })
         myBall.checkCollision(myGamePiece);
+        moveMyGameObject();
         if (gameStop)
             myGameArea.stop();
-        moveMyGameObject();
     }
 
     window.addEventListener('keydown', function (e) {
@@ -256,14 +269,13 @@
     function moveMyGameObject() {
         myGamePiece.speedX = 0;
 
-        if (keyState["ArrowRight"] && myGamePiece.x <= width - padOffset)
+        if (keyState["ArrowRight"] && myGamePiece.x + myGamePiece.width <= width)
             myGamePiece.speedX = padSpeed;
 
-        if (keyState["ArrowLeft"] && myGamePiece.x + myGamePiece.width >= padOffset)
+        if (keyState["ArrowLeft"] && myGamePiece.x >= 0)
             myGamePiece.speedX = -padSpeed;
 
     }
-
 
     request.onerror = function (event) {
         console.log("error: ");
