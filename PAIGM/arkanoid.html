@@ -34,8 +34,8 @@
 </head>
 <body onload="startGame()">
 
-<button class="button-left" onmousedown="startGame()" ontouchstart="startGame()">START</button>
-<button class="button-right" onmousedown="myGameArea.stop()" ontouchstart="myGameArea.stop()">STOP</button>
+<button class="button-left" onmousedown="startGame()">START</button>
+<button class="button-right" onmousedown="myGameArea.stop()">STOP</button>
 <button onclick="readLeaderboard()">Read leaderboard</button>
 <p id="score"></p>
 </body>
@@ -65,6 +65,14 @@
     let request = window.indexedDB.open("leaderboard", 1);
     let movementFactorX = 1;
     let movementFactorY = 1;
+    let pieceWidth;
+    let pieceHeight;
+    let ballRadius;
+    let startBlockX = 30;
+    let startBlockY = 30;
+    let blockSpacing = 10;
+    let blockWidth = 50;
+    let blockHeight = 50;
 
     function startGame() {
         obstacles = [];
@@ -76,8 +84,13 @@
         gameStop = false;
         movementFactorX = 1;
         movementFactorY = 1;
-        myGamePiece = new Component(100, 20, "red", 300, height - 20);
-        myBall = new Component(0, 0, "red", 350, height - 20 - 5, 5);
+        pieceWidth = 100;
+        pieceHeight = 20;
+        ballRadius = 5;
+
+        myGamePiece = new Component(pieceWidth, pieceHeight, "red", (width - pieceWidth) / 2, height - pieceHeight);
+        myBall = new Component(0, 0, "red", 350, height - pieceHeight - ballRadius, ballRadius);
+
         myBall.speedX = ballSpeed;
         myBall.speedY = -ballSpeed;
         AddBlockRow();
@@ -95,6 +108,11 @@
         width: width,
         height: height,
         start: function () {
+            if (this.interval)
+                clearInterval(this.interval);
+            if (this.timer)
+                clearInterval(this.timer);
+            this.timer = null;
             this.canvas.width = this.width;
             this.canvas.height = this.height;
             this.context = this.canvas.getContext("2d");
@@ -118,19 +136,14 @@
         stop: function () {
             clearInterval(this.interval);
             clearInterval(this.timer);
-            // addScore();
-            // readLeaderboard();
+            addScore();
+            readLeaderboard();
         }
     }
 
     function AddBlockRow() {
-        let startBlock = 30;
-        let blockSpacing = 10;
-        let blockWidth = 50;
-        let blockHeight = 50;
-
-        for (let y = startBlock; y < 3 * blockHeight + startBlock; y += blockHeight + blockSpacing) {
-            for (let x = startBlock; x < width - blockWidth; x += blockWidth + blockSpacing) {
+        for (let y = startBlockY; y < 3 * blockHeight + startBlockY; y += blockHeight + blockSpacing) {
+            for (let x = startBlockX; x < width - blockWidth; x += blockWidth + blockSpacing) {
                 obstacles.push(new Component(blockWidth, blockHeight, "green", x, y));
             }
         }
@@ -167,14 +180,11 @@
         };
         this.collisionGameArea = function () {
             // Handling collision with GameArea
-            if (this.x + this.radius >= myGameArea.canvas.width) {
-                this.speedX = -ballSpeed / movementFactorX;
-            }
-            if (this.x - this.radius <= 0) {
-                this.speedX = ballSpeed / movementFactorX;
+            if (this.x + this.radius >= myGameArea.canvas.width || this.x - this.radius <= 0) {
+                this.speedX = -this.speedX;
             }
             if (this.y - this.radius <= 0) {
-                this.speedY = ballSpeed / movementFactorY;
+                this.speedY = -this.speedY;
             }
             if (this.y + this.radius >= myGameArea.canvas.height) {
                 gameStop = true;
@@ -183,27 +193,31 @@
         }
         this.checkCollision = function (object) {
 
-            x = clamp(object.x, object.x + object.width, this.x);
-            y = clamp(object.y, object.y + object.height, this.y);
+            let x = clamp(object.x, object.x + object.width, this.x);
+            let y = clamp(object.y, object.y + object.height, this.y);
 
             if (Math.pow(x - this.x, 2) + Math.pow(y - this.y, 2) <= Math.pow(this.radius, 2)) {
                 if (this.x > object.x && this.x < object.x + object.width) {
                     movementFactorY = movementFactor(this.x, object.x, object.width);
                     if (this.y < object.y) {
                         this.speedY = -ballSpeed / movementFactorY;
-                    }
-                    if (this.y > object.y + object.height) {
+                    } else if (this.y > object.y + object.height) {
                         this.speedY = ballSpeed / movementFactorY;
                     }
-                }
-                if (this.y > object.y && this.y < object.y + object.height) {
+                    this.speedX = (this.speedX / Math.abs(this.speedX)) * (ballSpeed * 2 - Math.abs(this.speedY));
+
+                } else if (this.y > object.y && this.y < object.y + object.height) {
                     movementFactorX = movementFactor(this.y, object.y, object.height);
                     if (this.x < object.x) {
                         this.speedX = -ballSpeed / movementFactorX;
-                    }
-                    if (this.x > object.x + object.width) {
+                    } else if (this.x > object.x + object.width) {
                         this.speedX = ballSpeed / movementFactorX;
                     }
+                    this.speedY = (this.speedY / Math.abs(this.speedY)) * (ballSpeed * 2 - Math.abs(this.speedX));
+
+                } else {
+                    this.speedX = -this.speedX;
+                    this.speedY = -this.speedY;
                 }
                 return true;
             }
@@ -217,21 +231,14 @@
     }
 
     function movementFactor(ballCenter, begin, length) {
-        let _movementFactor;
-        if (ballCenter <= begin + length / 10)
+        let _movementFactor = 1;
+        if (ballCenter <= begin + length / 10 || ballCenter >= begin + length * 9 / 10)
             _movementFactor = 3;
-        else if (ballCenter <= begin + length * 3 / 10)
+        else if (ballCenter <= begin + length * 3 / 10 || ballCenter >= begin + length * 7 / 10)
             _movementFactor = 2;
-        else if (ballCenter <= begin + length * 4 / 10)
+        else if (ballCenter <= begin + length * 4 / 10 || ballCenter >= begin + length * 6 / 10)
             _movementFactor = 1.5;
-        else if (ballCenter <= begin + length * 6 / 10)
-            _movementFactor = 1;
-        else if (ballCenter <= begin + length * 7 / 10)
-            _movementFactor = 1.5;
-        else if (ballCenter <= begin + length * 9 / 10)
-            _movementFactor = 2;
-        else
-            _movementFactor = 3
+
         return _movementFactor
     }
 
