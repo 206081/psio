@@ -1,4 +1,5 @@
 import os.path
+import pathlib
 
 import matplotlib.pyplot as plt
 import pydicom
@@ -28,7 +29,8 @@ def read_images_5(dir_path, imgs):
         cmap = plt.cm.bone
 
         fig = plt.figure(_img)
-        rows = 4
+        bins = [32, 64, 128, 256]
+        rows = len(bins) + 1
         columns = 2
 
         # Show original photo
@@ -42,7 +44,7 @@ def read_images_5(dir_path, imgs):
         plt.imshow(img2, cmap=cmap, vmin=vmin, vmax=vmax)
         plt.axis("off")
 
-        for i, bins in enumerate([32, 64, 256]):
+        for i, bins in enumerate(bins):
             # Histogram of original image with different bins.
             fig.add_subplot(rows, columns, 3 + i * 2, title=f"Bins: {bins}")
             plt.hist(img.ravel(), bins=bins)
@@ -55,6 +57,6 @@ def read_images_5(dir_path, imgs):
 
 
 if __name__ == "__main__":
-    dir_path = r"/input2"
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input2")
     listdir = (file for file in os.listdir(dir_path) if file.split(".")[-1].upper() == "DCM")
     read_images_5(dir_path, listdir)

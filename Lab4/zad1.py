@@ -26,7 +26,7 @@ def read_lungs(_img):
         # _img_seed_3,
     )
     beta = (10000,)
-    column = len(beta) * 2 + 1
+    column = len(beta) * 2 + 2
 
     # for i, seed in enumerate(seeds, 1):
     #     plt.figure(i)
@@ -49,17 +49,21 @@ def read_lungs(_img):
         plt.figure(i)
 
         for j, _beta in enumerate(beta):
-            plt.subplot(row, column, 2 + j * 2)
-            plt.imshow(seed, cmap=plt.cm.bone)
+            # plt.subplot(row, column, 2 + j * 2)
+            # plt.imshow(seed, cmap=plt.cm.bone)
             walker = random_walker(_img, seed, beta=_beta)
             masked = masked_where(walker == 1, walker)
-            plt.subplot(row, column, 3 + j * 2)
-            plt.imshow(masked, cmap=plt.cm.bone)
-
-            ax = plt.subplot(row, column, 1 + j * 2)
+            ax = plt.subplot(row, column, 3 + j * 2)
+            ax.imshow(masked, cmap=plt.cm.bone)
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
+            ax = plt.subplot(row, column,   + j * 2)
             ax.imshow(_img, cmap=plt.cm.bone)
-            ax.imshow(masked, interpolation="none", cmap="autumn", alpha=1)
-
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
+            # ax.imshow(_img, cmap=plt.cm.bone)
+            # ax.imshow(masked, interpolation="none", cmap="autumn", alpha=1)
+    # plt.axis("off")
     plt.show(block=True)
 
 

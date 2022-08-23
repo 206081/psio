@@ -1,4 +1,5 @@
 import os.path
+import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -56,6 +57,6 @@ def read_images_5(dir_path, imgs):
 
 
 if __name__ == "__main__":
-    dir_path = r"/input2"
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input2")
     listdir = (file for file in os.listdir(dir_path) if file.split(".")[-1].upper() == "DCM")
     read_images_5(dir_path, listdir)

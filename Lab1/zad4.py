@@ -22,7 +22,7 @@ def read_images_4(dir_path, imgs):
 
         # Read image
         img = imread(os.path.join(dir_path, _img))
-
+        img = img_to_float32
         # Add first image to figure
         fig.add_subplot(rows, columns, 1)
         plt.imshow(img)
@@ -46,5 +46,5 @@ def read_images_4(dir_path, imgs):
 
 
 if __name__ == "__main__":
-    dir_path = os.path.join("images", "../input1")
+    dir_path = os.path.join(pathlib.Path(__file__).parent.parent, "input1")
     read_images_4(dir_path, os.listdir(dir_path))
